@@ -31,10 +31,12 @@ namespace Task
         {
 
             services.AddControllers();
-
+            services.AddDistributedMemoryCache();
+            services.AddSession();
             services.AddDbContext<TaskAPIContext>(options =>
                  options.UseSqlServer(
-                     _config.GetConnectionString("NurseryAPIContext")).EnableSensitiveDataLogging());
+                     _config.GetConnectionString("NurseryAPIContext")));
+            
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -50,7 +52,7 @@ namespace Task
             //app.UseHttpsRedirection();
 
             app.UseRouting();
-
+            app.UseSession();
             //app.UseAuthorization();
 
             app.UseEndpoints(endpoints =>

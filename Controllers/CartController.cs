@@ -1,8 +1,10 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Task.Data;
 using Task.Model;
@@ -11,62 +13,130 @@ namespace Task.Controllers
 {
     public class CartController : Controller
     {
-        public TaskAPIContext _context;
+        private readonly TaskAPIContext _context;
+
         public CartController(TaskAPIContext context)
         {
             _context = context;
         }
         [HttpGet]
-        [Route("/cart")]
-        public async Task<ActionResult<IEnumerable<ShoppingCart>>> GetItem()
+        [Route("api/cart")]
+        public ResponseModel<ShoppingCartViewModel> GetCartItems()
         {
-            var getCookie = Request.Cookies.ContainsKey("nurseryCart") ? Request.Cookies["nurseryCart"] : "";
-
-            if (string.IsNullOrEmpty(getCookie))
+            ResponseModel<ShoppingCartViewModel> response = new();
+            if (string.IsNullOrEmpty(HttpContext.Session.GetString("SESSION_KEY")))
             {
-                return Json("Empty Cart");
+                response.IsSuccess = false;
+                response.ErrorMsg = "No items inside the cart";
+                return response;
             }
-
-            var allItems = await _context.cart.ToListAsync();
-            if(allItems == null)
+            else
             {
-                return Json("Empty Cart");
+                List<ShoppingCartViewModel> cartViewModels = new();
+                var data = HttpContext.Session.GetString("SESSION_KEY").ToString();
+                var models = JsonSerializer.Deserialize<List<SessionModel>>(data);
+                foreach (var item in models)
+                {
+                    ShoppingCartViewModel model = new()
+                    {
+                        Itemid = item.ItemId,
+                        ItemName = item.ItemName,
+                        Quantity = item.Quantity
+                    };
+                    cartViewModels.Add(model);
+                }
+
+                response.IsSuccess = true;
+                response.List = cartViewModels;
             }
-            return allItems;
+            return response;
         }
 
         // GET: api/Product/2
-        [HttpGet("/cart/{ItemId}")]
-        public IActionResult AddItem(string ItemId)
+        [HttpPost("/api/cart/AddItems")]
+        public ResponseModel<ShoppingCartViewModel> AddItemAsync([FromBody] AddCartRequest request)
         {
-            if(ItemId != null)
+            try
             {
-                var availableItemCount = _context.records.Where(x => x.ItemId == ItemId).Select(y => y.AvailableStocks).FirstOrDefault();
-                if(Convert.ToInt32(availableItemCount)>0)
+                ResponseModel<ShoppingCartViewModel> response = new ResponseModel<ShoppingCartViewModel>();
+
+                if (request != null)
                 {
-                    if (Request.Cookies.ContainsKey("nurseryCart"))
+                    var product = _context.records.Where(x => x.ItemId == request.ItemId).FirstOrDefault();
+                    if (product == null)
                     {
-                        var cookieValue = Request.Cookies["nurseryCart"].ToString();
-                        if (!string.IsNullOrEmpty(cookieValue))
+                        response.IsSuccess = false;
+                        response.ErrorMsg = "Wrong Item selected";
+                        return response;
+                    }
+                    if (product.AvailableStocks > 0)
+                    {
+                        if (product.AvailableStocks < request.Quantity)
                         {
-                            cookieValue += "," + ItemId;
-                            Response.Cookies.Delete("nurseryCart");
-                            Response.Cookies.Append("nurseryCart", cookieValue);
+                            response.IsSuccess = false;
+                            response.ErrorMsg = $"Quantity must be less than Availablity. Current Availability : {product.AvailableStocks}";
+                            return response;
+                        }
+                        if (string.IsNullOrEmpty(HttpContext.Session.GetString("SESSION_KEY")))
+                        {
+                            List<SessionModel> models = new();
+                            SessionModel model = new()
+                            {
+                                ItemId = product.ItemId,
+                                Quantity = request.Quantity,
+                                ItemName = product.ItemName
+                            };
+                            models.Add(model);
+                            //var product = JsonSerializer.Serialize()
+                            HttpContext.Session.SetString("SESSION_KEY", JsonSerializer.Serialize(models));
                         }
                         else
                         {
-                            Response.Cookies.Append("nurseryCart", ItemId);
+                            var data = HttpContext.Session.GetString("SESSION_KEY").ToString();
+                            var models = JsonSerializer.Deserialize<List<SessionModel>>(data);
+                            SessionModel model = new()
+                            {
+                                ItemId = product.ItemId,
+                                Quantity = request.Quantity,
+                                ItemName = product.ItemName
+                            };
+                            models.Add(model);
+                            HttpContext.Session.SetString("SESSION_KEY", JsonSerializer.Serialize(models));
                         }
+                        product.AvailableStocks -= request.Quantity;
+                        _context.records.Update(product);
+                        _context.SaveChanges();
+                        response.IsSuccess = true;
+                        response.data = new ShoppingCartViewModel() { Itemid = product.ItemId, Quantity = request.Quantity, ItemName = product.ItemName };
+                        return response;
                     }
                     else
                     {
-                        Response.Cookies.Append("nurseryCart", ItemId);
+                        response.IsSuccess = true;
+                        response.ErrorMsg = "Product out of stock";
+                        return response;
                     }
+
                 }
-                
+                else
+                {
+                    response.IsSuccess = false;
+                    response.ErrorMsg = "Internal Server Error";
+                    return response;
+                }
+            }
+            catch (Exception ex)
+            {
+
+                ResponseModel<ShoppingCartViewModel> response = new()
+                {
+                    IsSuccess = false,
+                    ErrorMsg = ex.Message
+
+                };
+                return response;
             }
 
-            return RedirectToAction("GetItem");
         }
     }
 }

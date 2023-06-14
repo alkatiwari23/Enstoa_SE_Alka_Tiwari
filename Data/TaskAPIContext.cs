@@ -11,7 +11,7 @@ namespace Task.Data
     {
         public TaskAPIContext(DbContextOptions<TaskAPIContext> options) : base(options) { }
         public DbSet<Record> records { get; set; }
-        public DbSet<ShoppingCart> cart { get; set; }
+        //public DbSet<ShoppingCartViewModel> cart { get; set; }
     }
 }
         

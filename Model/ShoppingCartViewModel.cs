@@ -6,11 +6,11 @@ using System.Threading.Tasks;
 
 namespace Task.Model
 {
-    [Table("ShoppingCart")]
-    public class ShoppingCart
+    
+    public class ShoppingCartViewModel
     {
-#nullable enable
-        public string? Itemid { get; set; }
-        public string? Quantity { get; set; }
+        public string Itemid { get; set; }
+        public int Quantity { get; set; }
+        public string ItemName { get; set; }
     }
 }

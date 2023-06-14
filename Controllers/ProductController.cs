@@ -9,8 +9,7 @@ using Task.Model;
 
 namespace Task.Controllers
 {
-    //[Route("api/[controller]")]
-    //[ApiController]
+    
     public class ProductController : Controller
     {
         public TaskAPIContext _context;
@@ -19,92 +18,128 @@ namespace Task.Controllers
             _context = context;
         }
 
-        // GET: api/Product
         [HttpGet]
         [Route("/list")]
-        public async Task<ActionResult<IEnumerable<Record>>> GetProduct()
+        public ResponseModel<GetRecordResponseModel> GetProduct()
         {
-            var allItems = await _context.records.ToListAsync();
-            return allItems;
+            ResponseModel<GetRecordResponseModel> response = new();
+            var records = _context.records.ToList();
+            if (records.Count > 0)
+            {
+                List<GetRecordResponseModel> getRecords = new();
+                foreach (var item in records)
+                {
+                    GetRecordResponseModel model = new()
+                    {
+                        ItemId = item.ItemId,
+                        ItemName = item.ItemName,
+                        QuantityInStock = item.AvailableStocks
+                    };
+                    getRecords.Add(model);
+                }
+                response.IsSuccess = true;
+                response.List = getRecords;
+            }
+            else
+            {
+                response.IsSuccess = false;
+                response.ErrorMsg = "No Record Found";
+            }
+            return response;
         }
 
-        // POST: api/Employees
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
         [Route("/list")]
-        public async Task<ActionResult<Record>> PostProduct([FromBody] Record reco)
+        public ResponseModel<Record> PostProduct([FromBody] AddNewRecordRequest request)
         {
-            _context.records.Add(reco);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction("GetProduct", new { id = reco.ItemId }, reco);
+            ResponseModel<Record> model = new();
+            if (string.IsNullOrEmpty(request.ItemName))
+            {
+                model.IsSuccess = false;
+                model.ErrorMsg = "Item name should not be null";
+                return model;
+            }
+            if (request.QuantityInStock <= 0)
+            {
+                model.IsSuccess = false;
+                model.ErrorMsg = "Quantity must be greater than 0";
+                return model;
+            }
+            Record record = new()
+            {
+                ItemId = Guid.NewGuid().ToString(),
+                ItemName = request.ItemName,
+                AvailableStocks = request.QuantityInStock
+            };
+            _context.records.Add(record);
+            _context.SaveChanges();
+            model.IsSuccess = true;
+            model.data = record;
+            return model;
         }
 
-        // GET: api/Product/2
         [HttpGet("/list/{ItemId}")]
-        public async Task<ActionResult<Record>> GetProduct(string ItemId)
+        public ResponseModel<Record> GetProductById(string ItemId)
         {
-            var thisRecord = await _context.records.FindAsync(ItemId);
+            ResponseModel<Record> response = new();
+
+            var thisRecord = _context.records.Find(ItemId);
 
             if (thisRecord == null)
             {
-                return NotFound();
+                response.ErrorMsg = "No record found";
+                return response;
             }
-
-            return thisRecord;
+            else
+            {
+                response.IsSuccess = true;
+                response.data = thisRecord;
+                return response;
+            }
         }
 
-        // PUT: api/Employees/5
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPut("/list/{ItemId}")]
-        public async Task<IActionResult> PutEmployee(string ItemId, [FromBody] Record reco)
+        public ResponseModel<Record> PutEmployee([FromBody] UpdateRecordRequest request, string ItemId)
         {
-            if (ItemId != reco.ItemId)
+            ResponseModel<Record> response = new();
+            var detail = _context.records.Where(x => x.ItemId == ItemId).FirstOrDefault();
+            if (detail != null)
             {
-                return BadRequest();
+                detail.ItemName = request.ItemName;
+                detail.AvailableStocks = request.StockInQuantity;
+                _context.records.Update(detail);
+                _context.SaveChanges();
+                response.IsSuccess = true;
+                response.data = detail;
+                return response;
             }
-
-            _context.Entry(reco).State = EntityState.Modified;
-
-            try
+            else
             {
-                await _context.SaveChangesAsync();
+                response.ErrorMsg = "No data found";
+                return response;
             }
-            catch (DbUpdateConcurrencyException)
-            {
-                //return NotFound();
-                if (!ProductExists(ItemId))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
-            }
-
-            return NoContent();
         }
 
-        // DELETE: api/Employees/5
         [HttpDelete("/list/{ItemId}")]
-        public async Task<IActionResult> DeleteProduct(string ItemId)
+        public ResponseModel<Record> DeleteProduct(string ItemId)
         {
-            var product = await _context.records.FindAsync(ItemId);
+            ResponseModel<Record> response = new();
+            var product = _context.records.Find(ItemId);
             if (product == null)
             {
-                return NotFound();
+                response.ErrorMsg = "No data found.";
+                return response;
+            }
+            else
+            {
+                _context.records.Remove(product);
+                _context.SaveChanges();
+                response.IsSuccess = true;
+                response.data = product;
+                return response;
             }
 
-            _context.records.Remove(product);
-            await _context.SaveChangesAsync();
 
-            return NoContent();
-        }
-
-        private bool ProductExists(string id)
-        {
-            return _context.records.Any(x => x.ItemId == id);
         }
     }
 }
