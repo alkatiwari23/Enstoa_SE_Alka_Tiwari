@@ -1,0 +1,21 @@
+The Planning Process-
+
+Step 1: I have designed a database table named as Records.
+In Records table I have used 3 columns ItemId, ItemName, AvailableStocks.
+ItemId is used as primary key, Itemname consist of Names of the Plants, AvailableStocks contains the number of plants available in the Nursery.
+
+
+Step 2: In the 2nd step I have design the work flow of the API.
+In API I have created 3 controllers- Home, Product, and Cart. 
+-Home is the controller which is called when we run the API (CTRL+F5).
+	
+-Product controller is used for the Seller of the Nursery who can add, update, view, delete his/her all records related of the plants. 
+For every request and response we are showing the success in T/F and if there is any error then the error msg will display. It will help us in accessing the API using postman.
+	
+-Cart controller is used for the customer to add plants and its quanity into the cart with the help of session. When the customer added any number of plants the database gets updated accordingly. 
+I have design the cart controller by keeping the out of stock scenerio in mind. I have checked the available quantity before adding to the cart. If the available quantity is less then I am showing a msg, also checking that the requested ItemId is geniune or not. After checking both the condition the customer will able to add the item in the cart. 
+
+
+Features would/should be added-
+
+We should do authorization, payment gateway, account creation, shoppingcart database management, all these features makes our API more secure, data oriented, and easy to use  
